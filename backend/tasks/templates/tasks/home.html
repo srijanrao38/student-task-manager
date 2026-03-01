@@ -1,0 +1,83 @@
+{% extends 'base.html' %}
+{% block content %}
+
+    <p>welcome {{ request.user.username }}|
+    </p>
+    <h2>add task</h2>
+    <form method="POST">
+        {% csrf_token %}
+        <input type="text" name="title" placeholder="task title" required><br><br>
+        <input type="text" name="subject" placeholder="subject" required><br><br>
+        <input type="date" name="due_date" required><br><br>
+
+        <select name="priority">
+            <option value="LOW">LOW</option>
+            <option value="MEDIUM">MEDIUM</option>
+            <option value="HIGH">HIGH</option> 
+            <br><br>
+        </select>
+        <button type="submit">add task </button>
+        
+    </form>
+    <div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card text-bg-primary">
+            <div class="card-body">
+                <h5>total task</h5>
+                <h3>{{ total_tasks }}</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-bg-success">
+            <div class="card-body">
+                <h5>completed tasks</h5>
+                <h3>{{ completed_tasks }}</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-bg-warning">
+            <div class="card-body">
+                <h5>pending tasks</h5>
+                <h3>{{ pending_tasks }}</h3>
+            </div>
+        </div>
+    </div>
+</div>
+
+    <h2>your tasks</h2>
+    {%if tasks %}
+    <ul>
+        {% for task in tasks %}
+        <li>
+            <b>{{ task.title }}</b>|
+            {{task.subject }}|
+            {{task.priority}}|
+            {{task.status}}|
+            Due: {{task.due_date}}
+        </li>
+        <form action="{% url 'delete_task' task.id %}" method="POST">
+             {% csrf_token%}
+             <button type="submit">delete</button>
+        </form>
+        <a href="{% url 'edit_task' task.id %}">edit</a>
+        <form action="{%url 'toggle_status' task.id %}" method="POST">
+            {% csrf_token %}
+            <button type="submit">
+                {%if task.status == 'PENDING' %}
+                mark as completed
+                {%else %}
+                mark as pending
+                {%endif%}
+            </button>
+            
+        </form>
+        {%endfor %}
+
+    </ul>
+    {%else%}
+    <p>no task yet</p>
+    {%endif%}
+    {% endblock %}
+
