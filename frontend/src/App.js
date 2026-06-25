@@ -258,6 +258,139 @@ function App() {
     }
   };
 
+  // Download response as PDF
+  const handleDownloadPDF = (taskTitle, responseType, content) => {
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) {
+      showToast("Please allow popups to download PDF", "error");
+      return;
+    }
+    
+    const docTitle = `${taskTitle.replace(/[^a-z0-9]/gi, '_')}_${responseType.toLowerCase()}`;
+    
+    let htmlContent = `
+      <html>
+        <head>
+          <title>${docTitle}</title>
+          <style>
+            body {
+              font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+              color: #1e293b;
+              padding: 40px;
+              max-width: 800px;
+              margin: 0 auto;
+              line-height: 1.6;
+            }
+            .header {
+              border-bottom: 2px solid #4f46e5;
+              padding-bottom: 15px;
+              margin-bottom: 30px;
+            }
+            .title {
+              font-size: 24px;
+              font-weight: 800;
+              color: #1e1b4b;
+              margin: 0 0 5px 0;
+            }
+            .subtitle {
+              font-size: 14px;
+              color: #64748b;
+              margin: 0;
+              text-transform: uppercase;
+              letter-spacing: 1px;
+            }
+            .section {
+              background: #f8fafc;
+              border: 1px solid #e2e8f0;
+              border-radius: 12px;
+              padding: 20px;
+              margin-bottom: 20px;
+              page-break-inside: avoid;
+            }
+            .question {
+              font-size: 16px;
+              font-weight: 700;
+              color: #0f172a;
+              margin: 0 0 10px 0;
+            }
+            .label {
+              font-size: 11px;
+              font-weight: 850;
+              color: #4f46e5;
+              text-transform: uppercase;
+              letter-spacing: 0.5px;
+              margin-top: 15px;
+              margin-bottom: 3px;
+            }
+            .answer {
+              font-size: 14px;
+              color: #334155;
+              border-left: 3px solid #4f46e5;
+              padding-left: 12px;
+              margin-bottom: 15px;
+            }
+            .explanation-label {
+              color: #059669;
+            }
+            .explanation {
+              font-size: 13px;
+              color: #475569;
+              border-left: 3px solid #059669;
+              padding-left: 12px;
+              white-space: pre-line;
+            }
+            .plain-text {
+              white-space: pre-line;
+              font-size: 14px;
+              color: #334155;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1 class="title">${taskTitle}</h1>
+            <p class="subtitle">AI Generated ${responseType.charAt(0) + responseType.slice(1).toLowerCase()}</p>
+          </div>
+    `;
+
+    if (responseType === 'SOLUTION') {
+      const questions = parseAIResponse(content);
+      if (questions.length > 0) {
+        questions.forEach(q => {
+          htmlContent += `
+            <div class="section">
+              <h3 class="question">Q${q.number}: ${q.question}</h3>
+              <div class="label">Answer</div>
+              <div class="answer">${q.answer}</div>
+              ${q.explanation ? `
+                <div class="label explanation-label">Explanation</div>
+                <div class="explanation">${q.explanation}</div>
+              ` : ''}
+            </div>
+          `;
+        });
+      } else {
+        htmlContent += `<div class="plain-text">${content}</div>`;
+      }
+    } else {
+      htmlContent += `<div class="plain-text">${content}</div>`;
+    }
+
+    htmlContent += `
+          <script>
+            window.onload = function() {
+              window.print();
+              setTimeout(function() { window.close(); }, 500);
+            };
+          </script>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+  };
+
   // Parse AI Response Q&A text structure
   const parseAIResponse = (text) => {
     if (!text) return [];
@@ -770,9 +903,22 @@ function App() {
                     );
                   })}
 
+                  {expandedPanels[task.id] && (
+                    <button
+                      onClick={() => handleDownloadPDF(
+                        task.title, 
+                        expandedPanels[task.id], 
+                        task.ai_responses[expandedPanels[task.id]].generated_answer
+                      )}
+                      className="ml-auto text-indigo-650 dark:text-indigo-400 hover:text-indigo-750 dark:hover:text-indigo-300 hover:underline px-2 flex items-center gap-1 transition"
+                    >
+                      📥 Download PDF
+                    </button>
+                  )}
+
                   <button 
                     onClick={() => setExpandedPanels(prev => ({ ...prev, [task.id]: null }))}
-                    className="ml-auto text-slate-400 dark:text-slate-600 text-xxs tracking-wider uppercase hover:text-slate-650 px-2"
+                    className={`${expandedPanels[task.id] ? "" : "ml-auto"} text-slate-400 dark:text-slate-600 text-xxs tracking-wider uppercase hover:text-slate-650 px-2`}
                   >
                     Close Panel
                   </button>
