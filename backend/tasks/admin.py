@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Task
+from .models import Task, TaskFile, AIResponse
 
 @admin.register(Task)
 class TaskAdmin(admin.ModelAdmin):
@@ -17,4 +17,13 @@ class TaskAdmin(admin.ModelAdmin):
     search_fields=('title','subject')
 
 
-# Register your models here.
+@admin.register(TaskFile)
+class TaskFileAdmin(admin.ModelAdmin):
+    list_display = ('task', 'file', 'uploaded_at')
+    list_filter = ('uploaded_at',)
+
+
+@admin.register(AIResponse)
+class AIResponseAdmin(admin.ModelAdmin):
+    list_display = ('task', 'response_type', 'created_at')
+    list_filter = ('response_type', 'created_at')

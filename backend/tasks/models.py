@@ -33,4 +33,29 @@ class Task(models.Model):
 
     def __str__(self):
         return self.title 
-# Create your models here.
+
+
+class TaskFile(models.Model):
+    task = models.ForeignKey(Task, on_delete=models.CASCADE)
+    file = models.FileField(upload_to='task_files/')
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"File {self.file.name} for Task {self.task.title}"
+
+
+class AIResponse(models.Model):
+    RESPONSE_TYPES = [
+        ('SOLUTION', 'Solution'),
+        ('SUMMARY', 'Summary'),
+        ('QUIZ', 'Quiz'),
+    ]
+
+    task = models.ForeignKey(Task, on_delete=models.CASCADE)
+    response_type = models.CharField(max_length=20, choices=RESPONSE_TYPES, default='SOLUTION')
+    extracted_text = models.TextField(blank=True, default='')
+    generated_answer = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.response_type} for Task {self.task.title}"

@@ -1,34 +1,57 @@
 from django.shortcuts import render,redirect,get_object_or_404
-from .models import Task
+from .models import Task, TaskFile, AIResponse
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import UserCreationForm
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 import json
+import os
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate, login
+from .utils import extract_text_from_file, call_gemini_api
 
 
 @csrf_exempt
-
 def api_task(request):
     current_user = request.user
     if current_user.is_anonymous:
-        
-        current_user = request.user if not request.user.is_anonymous else User.objects.first()
+        current_user = User.objects.first()
+
+    if not current_user:
+        return JsonResponse({"error": "User not authenticated"}, status=401)
 
     if request.method == "GET":
-        tasks = Task.objects.filter(user=request.user)
+        tasks = Task.objects.filter(user=current_user).order_by('-created_at')
         data = []
-        
 
         for task in tasks:
+            files = []
+            for tf in task.taskfile_set.all():
+                files.append({
+                    "id": tf.id,
+                    "name": os.path.basename(tf.file.name),
+                    "url": request.build_absolute_uri(tf.file.url) if tf.file else ""
+                })
+
+            ai_responses = {}
+            for resp in task.airesponse_set.all():
+                ai_responses[resp.response_type] = {
+                    "id": resp.id,
+                    "response_type": resp.response_type,
+                    "extracted_text": resp.extracted_text,
+                    "generated_answer": resp.generated_answer,
+                    "created_at": resp.created_at
+                }
+
             data.append({
                 "id": task.id,
                 "title": task.title,
                 "subject": task.subject,
                 "priority": task.priority,
                 "status": task.status,
+                "due_date": task.due_date,
+                "files": files,
+                "ai_responses": ai_responses
             })
 
         return JsonResponse(data, safe=False)
@@ -37,7 +60,7 @@ def api_task(request):
         body = json.loads(request.body)
 
         task = Task.objects.create(
-            user=request.user,
+            user=current_user,
             title=body["title"],
             subject=body["subject"],
             priority=body["priority"],
@@ -51,6 +74,9 @@ def api_task(request):
             "subject": task.subject,
             "priority": task.priority,
             "status": task.status,
+            "due_date": task.due_date,
+            "files": [],
+            "ai_responses": {}
         })
 
      
@@ -184,3 +210,109 @@ def manual_login(request):
             return JsonResponse({"status": "error", "message": str(e)}, status=400)
             
     return JsonResponse({"status": "error", "message": "Method not allowed"}, status=405)
+
+
+@csrf_exempt
+def upload_file(request, task_id):
+    current_user = request.user
+    if current_user.is_anonymous:
+        current_user = User.objects.first()
+    
+    if not current_user:
+        return JsonResponse({"error": "User not authenticated"}, status=401)
+
+    task = get_object_or_404(Task, id=task_id, user=current_user)
+
+    if request.method == "POST":
+        if 'file' not in request.FILES:
+            return JsonResponse({"error": "No file provided"}, status=400)
+        
+        uploaded_file = request.FILES['file']
+        
+        # Validation for unsupported file types
+        ext = os.path.splitext(uploaded_file.name)[1].lower()
+        if ext not in ['.pdf', '.docx', '.jpg', '.png', '.jpeg']:
+            return JsonResponse({"error": "Unsupported file type. Allowed: PDF, DOCX, JPG, PNG"}, status=400)
+        
+        task_file = TaskFile.objects.create(task=task, file=uploaded_file)
+        
+        return JsonResponse({
+            "id": task_file.id,
+            "name": os.path.basename(task_file.file.name),
+            "url": request.build_absolute_uri(task_file.file.url)
+        }, status=201)
+    
+    return JsonResponse({"error": "Method not allowed"}, status=405)
+
+
+def process_ai_action(request, task_id, response_type):
+    current_user = request.user
+    if current_user.is_anonymous:
+        current_user = User.objects.first()
+    
+    if not current_user:
+        return JsonResponse({"error": "User not authenticated"}, status=401)
+        
+    task = get_object_or_404(Task, id=task_id, user=current_user)
+    
+    # Retrieve files
+    task_files = TaskFile.objects.filter(task=task)
+    if not task_files.exists():
+        return JsonResponse({"error": "No files uploaded for this task. Please upload a file first."}, status=400)
+        
+    full_extracted_text = ""
+    extraction_errors = []
+    
+    for tf in task_files:
+        try:
+            file_path = tf.file.path
+            text = extract_text_from_file(file_path)
+            if text:
+                full_extracted_text += f"\n--- Content from {os.path.basename(tf.file.name)} ---\n" + text
+        except Exception as e:
+            extraction_errors.append(f"{os.path.basename(tf.file.name)}: {str(e)}")
+            
+    if not full_extracted_text.strip():
+        error_msg = "Could not extract any text from the uploaded files. "
+        if extraction_errors:
+            error_msg += "Errors: " + "; ".join(extraction_errors)
+        return JsonResponse({"error": error_msg}, status=400)
+        
+    # Send to Gemini
+    try:
+        answer = call_gemini_api(response_type, full_extracted_text)
+        
+        # Save in AIResponse model
+        ai_resp, created = AIResponse.objects.update_or_create(
+            task=task,
+            response_type=response_type,
+            defaults={
+                'extracted_text': full_extracted_text,
+                'generated_answer': answer
+            }
+        )
+        
+        return JsonResponse({
+            "id": ai_resp.id,
+            "response_type": ai_resp.response_type,
+            "extracted_text": ai_resp.extracted_text,
+            "generated_answer": ai_resp.generated_answer,
+            "created_at": ai_resp.created_at
+        })
+    except Exception as e:
+        return JsonResponse({"error": f"AI Generation failed: {str(e)}"}, status=500)
+
+
+@csrf_exempt
+def generate_solution(request, task_id):
+    return process_ai_action(request, task_id, 'SOLUTION')
+
+
+@csrf_exempt
+def generate_summary(request, task_id):
+    return process_ai_action(request, task_id, 'SUMMARY')
+
+
+@csrf_exempt
+def generate_quiz(request, task_id):
+    return process_ai_action(request, task_id, 'QUIZ')

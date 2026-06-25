@@ -14,6 +14,10 @@ urlpatterns =[
     path("api/tasks/", views.api_task, name="api_tasks"),
     path('api/login/', views.manual_login, name='manual_login'),
     path('api/register/', views.register_user, name='register_user'),
+    path('api/tasks/<int:task_id>/upload/', views.upload_file, name='upload_file'),
+    path('api/tasks/<int:task_id>/generate-solution/', views.generate_solution, name='generate_solution'),
+    path('api/tasks/<int:task_id>/generate-summary/', views.generate_summary, name='generate_summary'),
+    path('api/tasks/<int:task_id>/generate-quiz/', views.generate_quiz, name='generate_quiz'),
     path('admin/', admin.site.urls , name='admin_panel'),
     
     
