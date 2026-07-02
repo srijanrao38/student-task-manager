@@ -55,7 +55,7 @@ function App() {
     const endpoint = isSigningUp ? "register" : "login";
     
     try {
-      const response = await fetch(`http://localhost:8000/api/${endpoint}/`, {
+      const response = await fetch(`/api/${endpoint}/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
@@ -91,7 +91,7 @@ function App() {
 
   useEffect(() => {
     if (user) {
-      fetch("http://localhost:8000/api/tasks/")
+      fetch("/api/tasks/")
         .then(res => {
           if (!res.ok) throw new Error("Failed to fetch tasks");
           return res.json();
@@ -111,7 +111,7 @@ function App() {
       showToast("Task title is required", "error");
       return;
     }
-    fetch("http://localhost:8000/api/tasks/", {
+    fetch("/api/tasks/", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -139,7 +139,7 @@ function App() {
   };
   
   const handleToggleStatus = (id) => {
-    fetch(`http://localhost:8000/toggle_status/${id}/`, {
+    fetch(`/toggle_status/${id}/`, {
       method: "POST", 
     })
       .then(res => res.json())
@@ -158,7 +158,7 @@ function App() {
   const handleDeleteTask = (id) => {
     if (!window.confirm("Are you sure you want to delete this task?")) return;
 
-    fetch(`http://localhost:8000/delete_task/${id}/`, {
+    fetch(`/delete_task/${id}/`, {
       method: "POST",
     })
       .then(() => {
@@ -187,7 +187,7 @@ function App() {
     fData.append("file", file);
 
     try {
-      const response = await fetch(`http://localhost:8000/api/tasks/${taskId}/upload/`, {
+      const response = await fetch(`/api/tasks/${taskId}/upload/`, {
         method: "POST",
         body: fData,
       });
@@ -226,7 +226,7 @@ function App() {
       const endpoint = type === 'SOLUTION' ? 'generate-solution' : 
                        type === 'SUMMARY' ? 'generate-summary' : 'generate-quiz';
       
-      const response = await fetch(`http://localhost:8000/api/tasks/${taskId}/${endpoint}/`, {
+      const response = await fetch(`/api/tasks/${taskId}/${endpoint}/`, {
         method: "POST"
       });
       
@@ -943,3 +943,4 @@ function App() {
 }
 
 export default App;
+
