@@ -18,6 +18,8 @@ urlpatterns =[
     path('api/tasks/<int:task_id>/generate-solution/', views.generate_solution, name='generate_solution'),
     path('api/tasks/<int:task_id>/generate-summary/', views.generate_summary, name='generate_summary'),
     path('api/tasks/<int:task_id>/generate-quiz/', views.generate_quiz, name='generate_quiz'),
+    path('api/agent/', views.agent_chat, name='agent_chat'),
+    path('api/google-login/', views.google_login, name='google_login'),
     path('admin/', admin.site.urls , name='admin_panel'),
     
     

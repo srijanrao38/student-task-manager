@@ -25,7 +25,10 @@ load_dotenv(BASE_DIR / '.env')
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-ym0sn7-*tjhpm7ev18h-g_wrc@31(as_!8yzi%4e7df561xfp+'
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY')
+if not SECRET_KEY:
+    from django.core.exceptions import ImproperlyConfigured
+    raise ImproperlyConfigured("DJANGO_SECRET_KEY is not set. Add it to backend/.env (see backend/.env.example).")
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -153,3 +156,6 @@ CORS_ALLOW_CREDENTIALS = True
 
 # Gemini AI API Key
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
+
+# Google Sign-In (must match the frontend's REACT_APP_GOOGLE_CLIENT_ID)
+GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID')

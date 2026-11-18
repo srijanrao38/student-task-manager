@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { GoogleLogin } from '@react-oauth/google';
 import { jwtDecode } from "jwt-decode";
+import AgentPanel from "./AgentPanel";
 
 function App() {
   const [tasks, setTasks] = useState([]);
@@ -25,6 +26,7 @@ function App() {
   const [toast, setToast] = useState(null);
   const [loadingStates, setLoadingStates] = useState({});
   const [expandedPanels, setExpandedPanels] = useState({}); // { [taskId]: 'SOLUTION' | 'SUMMARY' | 'QUIZ' | null }
+  const [showAgent, setShowAgent] = useState(false);
 
   // Apply Theme
   useEffect(() => {
@@ -80,13 +82,30 @@ function App() {
     }
   };
   
-  const handleLoginSuccess = (credentialResponse) => {
-    const decoded = jwtDecode(credentialResponse.credential);
-    setUser({
-      name: decoded.name || decoded.email,
-      email: decoded.email
-    }); 
-    showToast("Google Login successful!");
+  const handleLoginSuccess = async (credentialResponse) => {
+    // The backend verifies the Google token and creates/logs in the matching user.
+    try {
+      const res = await fetch("http://localhost:8000/api/google-login/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ credential: credentialResponse.credential }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.status !== "success") {
+        showToast(data.message || "Google Login Failed", "error");
+        return;
+      }
+      const decoded = jwtDecode(credentialResponse.credential);
+      setUser({
+        name: data.user.name || decoded.name || decoded.email,
+        email: data.user.email
+      });
+      showToast("Google Login successful!");
+    } catch (err) {
+      console.error(err);
+      showToast("Could not reach the server for Google Login", "error");
+    }
   };
 
   useEffect(() => {
@@ -124,7 +143,11 @@ function App() {
         due_date: dueDate || new Date().toISOString().split('T')[0],
       }),
     })
-      .then(res => res.json())
+      .then(async res => {
+        const data = await res.json();
+        if (!res.ok || data.error) throw new Error(data.error || "Error creating task");
+        return data;
+      })
       .then(newTask => {
         setTasks([newTask, ...tasks]);
         setTitle("");
@@ -134,7 +157,7 @@ function App() {
       })
       .catch(err => {
         console.error(err);
-        showToast("Error creating task", "error");
+        showToast(err.message || "Error creating task", "error");
       });
   };
   
@@ -592,6 +615,13 @@ function App() {
             {darkMode ? "☀️" : "🌙"}
           </button>
 
+          <button
+            onClick={() => setShowAgent(!showAgent)}
+            className="px-4 py-2.5 rounded-xl text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700 transition duration-200"
+          >
+            AI Agent
+          </button>
+
           <div className="flex items-center gap-3 bg-white dark:bg-slate-900 px-4 py-2 border border-slate-200/60 dark:border-slate-800 rounded-xl flex-grow md:flex-grow-0">
             <div className="w-8 h-8 rounded-lg bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-sm">
               {user.name.charAt(0).toUpperCase()}
@@ -613,6 +643,17 @@ function App() {
           </button>
         </div>
       </div>
+
+      {showAgent && (
+        <AgentPanel
+          onTasksChanged={() =>
+            fetch("http://localhost:8000/api/tasks/")
+              .then(res => res.json())
+              .then(data => setTasks(data))
+              .catch(err => console.error("ERROR:", err))
+          }
+        />
+      )}
 
       {/* Analytics Dashboard Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-6 gap-4 mb-8">
